@@ -579,7 +579,7 @@ def find_best_model(
         else:
             return float(np.mean(average_result))
 
-    random_seeds = np.random.randint(np.iinfo(np.int32).max, size=len(prediction_model_factories))
+    random_seeds = np.zeros(len(prediction_model_factories), dtype=np.int32)
     average_metric_scores = Parallel(n_jobs=n_jobs)(
         delayed(estimate_average_score)(prediction_model_factory, int(random_seed))
         for prediction_model_factory, random_seed in zip(prediction_model_factories, random_seeds)
