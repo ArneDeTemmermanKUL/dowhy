@@ -29,7 +29,7 @@ def interventional_samples(
     interventions: Dict[Any, Callable[[np.ndarray], Union[float, np.ndarray]]],
     observed_data: Optional[pd.DataFrame] = None,
     num_samples_to_draw: Optional[int] = None,
-) -> pd.DataFrame:
+) -> dict[str, np.ndarray]:
     """Performs intervention on nodes in the causal graph.
 
     :param causal_model: The probabilistic causal model we perform this intervention on .
@@ -61,8 +61,10 @@ def _interventional_samples(
     pcm: ProbabilisticCausalModel,
     observed_data: pd.DataFrame,
     interventions: Dict[Any, Callable[[np.ndarray], np.ndarray]],
-) -> pd.DataFrame:
-    samples = observed_data.copy()
+) -> dict[str, np.ndarray]:
+    samples: dict[str, np.ndarray] = {
+        col: observed_data[col].to_numpy() for col in observed_data
+    }
 
     affected_nodes = _get_nodes_affected_by_intervention(pcm.graph, interventions.keys())
     sorted_nodes = nx.topological_sort(pcm.graph)
@@ -74,7 +76,7 @@ def _interventional_samples(
             continue
 
         if is_root_node(pcm.graph, node):
-            node_data = samples[node].to_numpy()
+            node_data = samples[node]
         else:
             node_data = pcm.causal_mechanism(node).draw_samples(_parent_samples_of(node, pcm, samples))
 
@@ -107,7 +109,7 @@ def counterfactual_samples(
     interventions: Dict[Any, Callable[[np.ndarray], Union[float, np.ndarray]]],
     observed_data: Optional[pd.DataFrame] = None,
     noise_data: Optional[pd.DataFrame] = None,
-) -> pd.DataFrame:
+) ->  dict[str, np.ndarray]:
     """Estimates counterfactual data for observed data if we were to perform specified interventions. This function
     implements the 3-step process for computing counterfactuals by Pearl (see https://ftp.cs.ucla.edu/pub/stat_ser/r485.pdf).
 
@@ -150,11 +152,9 @@ def _counterfactual_samples(
     scm: StructuralCausalModel,
     interventions: Dict[Any, Callable[[np.ndarray], Union[float, np.ndarray]]],
     noise_data: pd.DataFrame,
-) -> pd.DataFrame:
+) -> dict[str, np.ndarray]:
     topologically_sorted_nodes = list(nx.topological_sort(scm.graph))
-    samples = pd.DataFrame(
-        np.empty((noise_data.shape[0], len(topologically_sorted_nodes))), columns=topologically_sorted_nodes
-    )
+    samples: dict[str, np.ndarray] = {}
 
     for node in topologically_sorted_nodes:
         if is_root_node(scm.graph, node):
@@ -268,5 +268,8 @@ def average_causal_effect(
     return np.mean(samples_from_target_alt) - np.mean(samples_from_target_ref)
 
 
-def _parent_samples_of(node: Any, scm: ProbabilisticCausalModel, samples: pd.DataFrame) -> np.ndarray:
-    return samples[get_ordered_predecessors(scm.graph, node)].to_numpy()
+def _parent_samples_of(
+    node: Any, scm: ProbabilisticCausalModel, samples: list[np.ndarray]
+) -> np.ndarray:
+    parent_samples = [samples[op] for op in get_ordered_predecessors(scm.graph, node)]
+    return np.stack(parent_samples,axis=1)

@@ -1,7 +1,7 @@
 from collections.abc import Callable
-from typing import Self
 
 import numpy as np
+import pandas as pd
 from dowhy.gcm.causal_mechanisms import ConditionalStochasticModel, StochasticModel
 from dowhy.gcm.util.general import shape_into_2d
 
@@ -18,8 +18,9 @@ class DefinedConditionalStochasticModel(ConditionalStochasticModel):
         self.relation = relation
         self.noise = noise
 
-    def fit(self, X: np.ndarray, Y: np.ndarray) -> None:  # noqa: N803
+    def fit(self, X: np.ndarray, Y: np.ndarray) -> None:
         """Fits the model according to the data."""
+        pass
 
     def evaluate(
         self,
@@ -39,8 +40,10 @@ class DefinedConditionalStochasticModel(ConditionalStochasticModel):
     def draw_noise_samples(self, num_samples: int) -> np.ndarray:
         return np.array([self.noise() for _ in range(num_samples)])
 
-    def clone(self) -> Self:
-        return DefinedConditionalStochasticModel(relation=self.relation, noise=self.noise)
+    def clone(self):
+        return DefinedConditionalStochasticModel(
+            relation=self.relation, noise=self.noise
+        )
 
 
 class DefinedStochasticModel(StochasticModel):
@@ -53,14 +56,14 @@ class DefinedStochasticModel(StochasticModel):
     ) -> None:
         self.distribution = distribution
 
-    def fit(self, x: np.ndarray) -> None:
+    def fit(self, X: np.ndarray) -> None:
         """Fits the model according to the data."""
 
     def draw_samples(self, num_samples: int) -> np.ndarray:
         """Draws samples for the fitted model."""
         return np.array([self.distribution() for _ in range(num_samples)])
 
-    def clone(self) -> Self:
+    def clone(self):
         return DefinedStochasticModel(distribution=self.distribution)
 
 
@@ -72,3 +75,44 @@ class RelationIndexer:
     def __call__(self, x: np.ndarray) -> np.ndarray:
         a = self.relation(x)
         return a[:, self.i]
+
+
+class AggregationMechanism(DefinedConditionalStochasticModel):
+    """A mechanism that aggregates samples based on a specified aggregation function. The aggregation is based on the index in the first column of the parent samples."""
+
+    def __init__(
+        self,
+        aggregation_function: Callable[[np.ndarray], float],
+    ):
+        self.aggregation_function = aggregation_function
+        self.noise = lambda: 0
+
+    def fit(self, X: np.ndarray, Y: np.ndarray) -> None:
+        pass
+
+    def evaluate(
+        self,
+        parent_samples: np.ndarray,
+        noise_samples: np.ndarray,
+    ) -> np.ndarray:
+        aggregation_column = parent_samples[:, 0]
+        parent_samples = parent_samples[:, 1:]  # Remove the aggregation column
+
+        parent_samples, noise_samples = shape_into_2d(parent_samples, noise_samples)
+
+        samples_df = pd.DataFrame(
+            data=parent_samples + noise_samples,
+            columns=["X"],
+            index=aggregation_column,
+            dtype=np.float64,
+        )
+        samples_agg: pd.DataFrame = samples_df.groupby(by=samples_df.index).aggregate(
+            self.aggregation_function
+        )
+
+        return samples_agg.to_numpy()
+
+    def clone(self):
+        return AggregationMechanism(
+            self.index.copy(), self.aggregation, self.aggregation_function
+        )
