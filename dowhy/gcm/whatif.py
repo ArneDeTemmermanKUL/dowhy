@@ -29,7 +29,7 @@ def interventional_samples(
     interventions: Dict[Any, Callable[[np.ndarray], Union[float, np.ndarray]]],
     observed_data: Optional[pd.DataFrame] = None,
     num_samples_to_draw: Optional[int] = None,
-) -> dict[str, np.ndarray]:
+) -> dict[str, pd.Series]:
     """Performs intervention on nodes in the causal graph.
 
     :param causal_model: The probabilistic causal model we perform this intervention on .
@@ -61,9 +61,9 @@ def _interventional_samples(
     pcm: ProbabilisticCausalModel,
     observed_data: pd.DataFrame,
     interventions: Dict[Any, Callable[[np.ndarray], np.ndarray]],
-) -> dict[str, np.ndarray]:
-    samples: dict[str, np.ndarray] = {
-        col: observed_data[col].to_numpy() for col in observed_data
+) -> dict[str, pd.Series]:
+    samples: dict[str, pd.Series] = {
+        col: observed_data[col] for col in observed_data
     }
 
     affected_nodes = _get_nodes_affected_by_intervention(pcm.graph, interventions.keys())
@@ -76,14 +76,14 @@ def _interventional_samples(
             continue
 
         if is_root_node(pcm.graph, node):
-            node_data = samples[node]
+            node_data = samples[node].to_numpy()
         else:
             node_data = pcm.causal_mechanism(node).draw_samples(_parent_samples_of(node, pcm, samples))
 
         # After drawing samples of the node based on the data generation process, we apply the corresponding
         # intervention. The inputs of downstream nodes are therefore based on the outcome of the intervention in this
         # node.
-        samples[node] = _evaluate_intervention(node, interventions, node_data.reshape(-1))
+        samples[node] = pd.Series(_evaluate_intervention(node, interventions, node_data.reshape(-1)))
 
     return samples
 
@@ -109,7 +109,7 @@ def counterfactual_samples(
     interventions: Dict[Any, Callable[[np.ndarray], Union[float, np.ndarray]]],
     observed_data: Optional[pd.DataFrame] = None,
     noise_data: Optional[pd.DataFrame] = None,
-) ->  dict[str, np.ndarray]:
+) ->  dict[str, pd.Series]:
     """Estimates counterfactual data for observed data if we were to perform specified interventions. This function
     implements the 3-step process for computing counterfactuals by Pearl (see https://ftp.cs.ucla.edu/pub/stat_ser/r485.pdf).
 
@@ -152,9 +152,9 @@ def _counterfactual_samples(
     scm: StructuralCausalModel,
     interventions: Dict[Any, Callable[[np.ndarray], Union[float, np.ndarray]]],
     noise_data: pd.DataFrame,
-) -> dict[str, np.ndarray]:
+) -> dict[str, pd.Series]:
     topologically_sorted_nodes = list(nx.topological_sort(scm.graph))
-    samples: dict[str, np.ndarray] = {}
+    samples: dict[str, pd.Series] = {}
 
     for node in topologically_sorted_nodes:
         if is_root_node(scm.graph, node):
@@ -164,7 +164,7 @@ def _counterfactual_samples(
                 _parent_samples_of(node, scm, samples), noise_data[node].to_numpy()
             )
 
-        samples[node] = _evaluate_intervention(node, interventions, node_data.reshape(-1))
+        samples[node] = pd.Series( _evaluate_intervention(node, interventions, node_data.reshape(-1)))
 
     return samples
 
@@ -269,7 +269,7 @@ def average_causal_effect(
 
 
 def _parent_samples_of(
-    node: Any, scm: ProbabilisticCausalModel, samples: list[np.ndarray]
+    node: Any, scm: ProbabilisticCausalModel, samples: dict[str,pd.Series]
 ) -> np.ndarray:
     parent_samples = [samples[op] for op in get_ordered_predecessors(scm.graph, node)]
     return np.stack(parent_samples,axis=1)
