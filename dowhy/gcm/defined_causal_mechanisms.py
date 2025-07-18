@@ -84,8 +84,7 @@ class AggregationMechanism(DefinedConditionalStochasticModel):
         self,
         aggregation_function: Callable[[np.ndarray], float],
     ):
-        self.aggregation_function = aggregation_function
-        self.noise = lambda: 0
+        super().__init__(aggregation_function,)
 
     def fit(self, X: np.ndarray, Y: np.ndarray) -> None:
         pass
@@ -99,20 +98,19 @@ class AggregationMechanism(DefinedConditionalStochasticModel):
         parent_samples = parent_samples[:, 1:]  # Remove the aggregation column
 
         parent_samples, noise_samples = shape_into_2d(parent_samples, noise_samples)
-
+        #TODO: how to integrate noise samples
         samples_df = pd.DataFrame(
-            data=parent_samples + noise_samples,
-            columns=["X"],
+            data=parent_samples,
             index=aggregation_column,
             dtype=np.float64,
         )
         samples_agg: pd.DataFrame = samples_df.groupby(by=samples_df.index).aggregate(
-            self.aggregation_function
+            self.relation
         )
 
         return samples_agg.to_numpy()
 
     def clone(self):
         return AggregationMechanism(
-            self.index.copy(), self.aggregation, self.aggregation_function
+            self.relation
         )
