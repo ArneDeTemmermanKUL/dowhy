@@ -104,7 +104,7 @@ class AggregationMechanism(DefinedConditionalStochasticModel):
             index=aggregation_column,
             dtype=np.float64,
         )
-        samples_agg: pd.DataFrame = samples_df.groupby(by=samples_df.index).aggregate(
+        samples_agg: pd.DataFrame = samples_df.groupby(by=samples_df.index).apply(
             self.relation
         )
 
