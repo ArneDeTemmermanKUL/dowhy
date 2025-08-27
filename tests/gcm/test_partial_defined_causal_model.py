@@ -6,20 +6,13 @@ from flaky import flaky
 import networkx as nx
 from pytest import approx
 
-from scipy import stats
-
 from dowhy.gcm import (
-    AdditiveNoiseModel,
-    EmpiricalDistribution,
-    ScipyDistribution,
     draw_samples,
     fit,
 )
 from dowhy.gcm.auto import assign_causal_mechanisms
 from dowhy.gcm.divergence import estimate_kl_divergence_continuous_clf
-from dowhy.gcm.ml import (
-    create_linear_regressor,
-)
+
 
 
 def _generate_data_with_categorical_input():
