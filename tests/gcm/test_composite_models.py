@@ -19,6 +19,7 @@ def graphs() -> list[nx.DiGraph]:
     graphs.append(graph)
     return graphs
 
+
 @fixture
 def datasets(n: int = 1000, n_aggregations: int = 20) -> list[pd.DataFrame]:
     datasets: list[pd.DataFrame] = []
@@ -26,7 +27,7 @@ def datasets(n: int = 1000, n_aggregations: int = 20) -> list[pd.DataFrame]:
     A = np.random.normal(loc=0, scale=1, size=n)
     B = 2 * A
 
-    aggregation1 = np.repeat(range(n_aggregations), int(n/n_aggregations))
+    aggregation1 = np.repeat(range(n_aggregations), int(n / n_aggregations))
 
     datasets.append(pd.DataFrame(data=dict(AAA_aggregation=aggregation1, A=A, B=B)))
 
@@ -50,18 +51,13 @@ def datasets(n: int = 1000, n_aggregations: int = 20) -> list[pd.DataFrame]:
 
 @fixture
 def links():
-    return {
-        (frozenset(["B"]), "C", "AAA_aggregation"): AggregationMechanism(
-            aggregation_function="sum"
-        )
-    }
+    return {(frozenset(["B"]), "C", "AAA_aggregation"): "sum"}
 
 
 @fixture
 def graphical_causal_models(
     graphs: list[nx.DiGraph], datasets: list[pd.DataFrame]
 ) -> list[gcm.StructuralCausalModel]:
-    
     causal_models = []
 
     for graph, dataset in zip(graphs, datasets):
@@ -78,15 +74,15 @@ def graphical_causal_models(
 
 
 @fixture
-def composite_gcm(graphical_causal_models: list[gcm.StructuralCausalModel],links):
-    composite = gcm.StructuralCausalModelComposite(models=graphical_causal_models, links=links)
+def composite_gcm(graphical_causal_models: list[gcm.StructuralCausalModel], links):
+    composite = gcm.StructuralCausalModelComposite(
+        models=graphical_causal_models, links=links
+    )
     return composite
 
 
-
-def test_interventional_samples(composite_gcm,datasets):
-
-    observed_data = datasets[0][["AAA_aggregation","A"]]
+def test_interventional_samples(composite_gcm, datasets):
+    observed_data = datasets[0][["AAA_aggregation", "A"]]
 
     samples = gcm.interventional_samples(
         causal_model=composite_gcm,
@@ -98,9 +94,9 @@ def test_interventional_samples(composite_gcm,datasets):
 
     for dataset in datasets:
         for column in dataset:
-
             if column == "AAA_aggregation":
                 continue
 
-
-            np.testing.assert_allclose(samples[column],dataset[column].values,atol=1.0,rtol=0.0)  
+            np.testing.assert_allclose(
+                samples[column], dataset[column].values, atol=1.0, rtol=0.0
+            )
