@@ -53,7 +53,7 @@ class DefinedStochasticModel(StochasticModel):
     ) -> None:
         self.distribution = distribution
 
-    def fit(self, x: np.ndarray) -> None:
+    def fit(self, X: np.ndarray) -> None:
         """Fits the model according to the data."""
 
     def draw_samples(self, num_samples: int) -> np.ndarray:
