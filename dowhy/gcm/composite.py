@@ -10,7 +10,7 @@ from dowhy.gcm.defined_causal_mechanisms import (
     AggregationMechanism,
     DefinedStochasticModel,
 )
-from collections import KeysView
+from collections.abc import KeysView
 
 class StructuralCausalModelComposite(ProbabilisticCausalModel):
     def __init__(
