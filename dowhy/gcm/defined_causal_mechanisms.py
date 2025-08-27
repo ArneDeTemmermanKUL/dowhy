@@ -13,7 +13,7 @@ class DefinedConditionalStochasticModel(ConditionalStochasticModel):
             [np.ndarray],
             np.ndarray,
         ],
-        noise: Callable[[], np.ndarray] = lambda: 0,
+        noise: Callable[[], float] = lambda: 0,
     ) -> None:
         self.relation = relation
         self.noise = noise
@@ -51,7 +51,7 @@ class DefinedStochasticModel(StochasticModel):
         self,
         distribution: Callable[
             [],
-            np.ndarray,
+            float,
         ],
     ) -> None:
         self.distribution = distribution
