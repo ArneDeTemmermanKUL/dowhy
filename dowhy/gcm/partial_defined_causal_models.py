@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable
+from typing import Union
 
 import pandas as pd
 from dowhy.gcm.causal_models import PARENTS_DURING_FIT, StructuralCausalModel
@@ -17,7 +18,7 @@ class PartialDefinedStructuralCausalModel(StructuralCausalModel):
     def add_known_mappings(
         self,
         known_mappings: dict[
-            tuple[dict[str], dict[str]],
+            tuple[frozenset[str], frozenset[str]],
             tuple[Callable[[tuple[float]], tuple[float,]], Callable[[], tuple[float,]]],
         ],
     ) -> None:
@@ -50,7 +51,7 @@ class PartialDefinedStructuralCausalModel(StructuralCausalModel):
                 self.set_causal_mechanism(vi, mechanism=mechanism)
                 self.graph.nodes[vi][PARENTS_DURING_FIT] = list(u)
 
-    def is_known_mapping(self, start_node: str | None, end_node: str) -> bool:
+    def is_known_mapping(self, start_node: Union[str, None], end_node: str) -> bool:
         try:
             causal_mechanism = self.causal_mechanism(node=end_node)
         except KeyError:

@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from typing import Self
 
 import numpy as np
 from dowhy.gcm.causal_mechanisms import ConditionalStochasticModel, StochasticModel
@@ -13,7 +12,7 @@ class DefinedConditionalStochasticModel(ConditionalStochasticModel):
             [np.ndarray],
             np.ndarray,
         ],
-        noise: Callable[[], np.ndarray] = lambda: 0,
+        noise: Callable[[], float] = lambda: 0,
     ) -> None:
         self.relation = relation
         self.noise = noise
@@ -39,7 +38,7 @@ class DefinedConditionalStochasticModel(ConditionalStochasticModel):
     def draw_noise_samples(self, num_samples: int) -> np.ndarray:
         return np.array([self.noise() for _ in range(num_samples)])
 
-    def clone(self) -> Self:
+    def clone(self):
         return DefinedConditionalStochasticModel(relation=self.relation, noise=self.noise)
 
 
@@ -48,7 +47,7 @@ class DefinedStochasticModel(StochasticModel):
         self,
         distribution: Callable[
             [],
-            np.ndarray,
+            float,
         ],
     ) -> None:
         self.distribution = distribution
@@ -60,7 +59,7 @@ class DefinedStochasticModel(StochasticModel):
         """Draws samples for the fitted model."""
         return np.array([self.distribution() for _ in range(num_samples)])
 
-    def clone(self) -> Self:
+    def clone(self):
         return DefinedStochasticModel(distribution=self.distribution)
 
 
