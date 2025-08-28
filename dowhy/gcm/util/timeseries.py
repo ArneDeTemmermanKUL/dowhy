@@ -140,8 +140,8 @@ def _parent_samples_of(
 def draw_samples_incremental(
     causal_model: ProbabilisticCausalModel,
     num_samples: int,
-    observed_data: pd.DataFrame= pd.DataFrame(),
-) -> pd.DataFrame:
+    observed_datas: list[pd.DataFrame],
+) -> dict[str,np.ndarray]:
     """Draws new joint samples from the given graphical causal model. This is done by first generating random samples
     from root nodes and then propagating causal downstream effects through the graph.
     :param causal_model: New samples are generated based on the given causal model.
@@ -149,14 +149,18 @@ def draw_samples_incremental(
     :return: A pandas data frame where columns correspond to the nodes in the graph and rows to the drawn joint samples.
     """
     validate_causal_graph(causal_model.graph)
+    if any(not isinstance(od, pd.DataFrame) for od in observed_datas):
+        raise ValueError("observed_data must be a list of pandas dataframes")
 
     sorted_nodes = temporal_topological_sort(causal_model.graph)
 
-    drawn_samples: pd.DataFrame = pd.DataFrame(np.full((num_samples,len(sorted_nodes)),np.nan) ,columns=sorted_nodes)
+    drawn_samples: dict[str, np.ndarray] = {
+        node:np.full(num_samples,np.nan) for node in sorted_nodes
+    }
 
-
-    for col in observed_data.columns:
-        drawn_samples.iloc[:len(observed_data[col]),drawn_samples.columns.get_loc(col)] = observed_data[col].to_numpy()
+    for observed_data in observed_datas:
+        for col in observed_data.columns:
+            drawn_samples[col][:len(observed_data[col])] = observed_data[col].to_numpy()
 
     # each generation must be evaluated in parallel
     generations = strongly_connected_components_sort(causal_model.graph)
@@ -170,14 +174,14 @@ def draw_samples_incremental(
             for iteration in range(num_samples):
                 for node in gen_nodes:
 
-                    if not np.isnan(drawn_samples.iloc[iteration,drawn_samples.columns.get_loc(node)]):
+                    if not np.isnan(drawn_samples[node][iteration]):
                         print(f"Using intial sample for {node} at row {iteration}.")
                         continue
 
                     causal_mechanism = causal_model.causal_mechanism(node)
 
                     if is_root_node(causal_model.graph, node):
-                        drawn_samples.iloc[iteration,drawn_samples.columns.get_loc(node)] = (
+                        drawn_samples[node][iteration] = (
                             causal_mechanism.draw_samples(1).squeeze()
                         )
                     else:
@@ -187,7 +191,7 @@ def draw_samples_incremental(
                        
                         x_nan_mask = pd.isna(_parent_samples).any(axis=1)
                         _parent_samples[x_nan_mask] = 0.0
-                        drawn_samples.iloc[iteration,drawn_samples.columns.get_loc(node)] = (
+                        drawn_samples[node][iteration] = (
                             causal_mechanism.draw_samples(_parent_samples).reshape(
                                 (-1)
                             )[-1]
@@ -200,11 +204,11 @@ def draw_samples_incremental(
 
                 if is_root_node(causal_model.graph, node):
 
-                    drawn_samples.iloc[n_filled_rows:,drawn_samples.columns.get_loc(node)] = causal_mechanism.draw_samples(num_samples - n_filled_rows).squeeze()
+                    drawn_samples[node][n_filled_rows:] = causal_mechanism.draw_samples(num_samples - n_filled_rows).squeeze()
 
                 else:
 
-                    drawn_samples.iloc[n_filled_rows:,drawn_samples.columns.get_loc(node)]= causal_mechanism.draw_samples(
+                    drawn_samples[node][n_filled_rows:] = causal_mechanism.draw_samples(
                                 _parent_samples_of(node, causal_model, drawn_samples)[n_filled_rows:]
                             ).squeeze()
 
