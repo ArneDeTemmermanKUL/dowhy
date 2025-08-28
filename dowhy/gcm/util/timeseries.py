@@ -140,7 +140,7 @@ def _parent_samples_of(
 def draw_samples_incremental(
     causal_model: ProbabilisticCausalModel,
     num_samples: int,
-    observed_data: pd.DataFrame= pd.DataFrame(),
+    observed_datas: list[pd.DataFrame]= [],
 ) -> pd.DataFrame:
     """Draws new joint samples from the given graphical causal model. This is done by first generating random samples
     from root nodes and then propagating causal downstream effects through the graph.
@@ -149,14 +149,16 @@ def draw_samples_incremental(
     :return: A pandas data frame where columns correspond to the nodes in the graph and rows to the drawn joint samples.
     """
     validate_causal_graph(causal_model.graph)
+    if any(not isinstance(od, pd.DataFrame) for od in observed_datas):
+        raise ValueError("observed_data must be a list of pandas dataframes")
 
     sorted_nodes = temporal_topological_sort(causal_model.graph)
 
     drawn_samples: pd.DataFrame = pd.DataFrame(np.full((num_samples,len(sorted_nodes)),np.nan) ,columns=sorted_nodes)
 
-
-    for col in observed_data.columns:
-        drawn_samples.iloc[:len(observed_data[col]),drawn_samples.columns.get_loc(col)] = observed_data[col].to_numpy()
+    for observed_data in observed_datas:
+        for col in observed_data.columns:
+            drawn_samples.iloc[:len(observed_data[col]),drawn_samples.columns.get_loc(col)] = observed_data[col].to_numpy()
 
     # each generation must be evaluated in parallel
     generations = strongly_connected_components_sort(causal_model.graph)
