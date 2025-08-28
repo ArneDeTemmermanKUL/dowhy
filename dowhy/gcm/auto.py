@@ -14,7 +14,7 @@ from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.preprocessing import MultiLabelBinarizer
 
 from dowhy.gcm import config
-from dowhy.gcm.causal_mechanisms import AdditiveNoiseModel, ClassifierFCM, DiscreteAdditiveNoiseModel
+from dowhy.gcm.causal_mechanisms import AdditiveNoiseModel, ClassifierFCM, DiscreteAdditiveNoiseModel,SelfReferentialAdditiveNoiseModel
 from dowhy.gcm.causal_models import CAUSAL_MECHANISM, ProbabilisticCausalModel, validate_causal_model_assignment
 from dowhy.gcm.ml import (
     ClassificationModel,
@@ -52,6 +52,8 @@ from dowhy.gcm.util.general import (
     set_random_seed,
     shape_into_2d,
 )
+
+from dowhy.gcm.util.timeseries import temporal_topological_sort, timelag_data
 from dowhy.graph import get_ordered_predecessors, is_root_node
 
 _LIST_OF_POTENTIAL_CLASSIFIERS_GOOD = [
@@ -303,7 +305,7 @@ def assign_causal_mechanisms(
 
     auto_assignment_summary = AutoAssignmentSummary()
 
-    for node in nx.topological_sort(causal_model.graph):
+    for node in temporal_topological_sort(causal_model.graph):
         if not override_models and CAUSAL_MECHANISM in causal_model.graph.nodes[node]:
             auto_assignment_summary.add_node_log_message(
                 node,
@@ -381,8 +383,11 @@ def assign_causal_mechanism_node(
     else:
         node_data = based_on[node].to_numpy()
 
+        predecessors_data = timelag_data(causal_model, node, based_on)
+        is_self_referenced = node in predecessors_data.columns
+
         best_model, model_performances = select_model(
-            based_on[get_ordered_predecessors(causal_model.graph, node)].to_numpy(),
+            predecessors_data.to_numpy(),
             node_data,
             quality,
         )

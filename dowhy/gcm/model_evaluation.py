@@ -44,6 +44,7 @@ from dowhy.gcm.ml.classification import (
 from dowhy.gcm.ml.regression import create_ada_boost_regressor, create_extra_trees_regressor, create_polynom_regressor
 from dowhy.gcm.stats import merge_p_values_fdr
 from dowhy.gcm.util.general import is_categorical, set_random_seed, shape_into_2d
+from dowhy.gcm.util.timeseries import temporal_topological_sort
 from dowhy.graph import get_ordered_predecessors, is_root_node
 
 
@@ -551,11 +552,15 @@ def _evaluate_model_performances(
         )
 
     random_seeds = np.random.randint(np.iinfo(np.int32).max, size=len(causal_model.graph.nodes))
+
+    acyclic_graph = causal_model.graph.copy()
+    acyclic_graph.remove_edges_from(nx.selfloop_edges(causal_model.graph))
+
     all_results = Parallel(n_jobs=n_jobs)(
         delayed(evaluate_node)(node, int(random_seeds[i]))
         for i, node in enumerate(
             tqdm(
-                list(nx.topological_sort(causal_model.graph)),
+                list(temporal_topological_sort(acyclic_graph)),
                 position=0,
                 leave=True,
                 disable=not config.show_progress_bars,

@@ -36,3 +36,5 @@ from .whatif import average_causal_effect, counterfactual_samples, interventiona
 
 from .equation_parser import create_causal_model_from_equations  # isort:skip
 from .composite import StructuralCausalModelComposite
+
+from .util.timeseries import draw_samples_incremental
