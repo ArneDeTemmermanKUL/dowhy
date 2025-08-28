@@ -264,6 +264,61 @@ class DiscreteAdditiveNoiseModel(AdditiveNoiseModel):
         return "Discrete " + super().__str__()
 
 
+
+class SelfReferentialAdditiveNoiseModel(AdditiveNoiseModel):
+    """Implements a self-referential additive noise model of the form Y = f(X, Y) + N, where N is assumed to be
+    independent of X and Y. This is a special case of a :py:class:`PostNonlinearModel <dowhy.gcm.PostNonlinearModel>`
+    where the function g is the identity function and the prediction model f can take both X and Y as inputs.
+    """
+
+    def __init__(self, prediction_model: PredictionModel, lag: tuple[int], start_value:float=0, noise_model: Optional[StochasticModel] = None) -> None:
+        if noise_model is None:
+            from dowhy.gcm.stochastic_models import EmpiricalDistribution
+
+            noise_model = EmpiricalDistribution()
+
+        if len(lag) == 0:
+            raise ValueError("Lag must not be empty!")
+        # check if all values of lag are larger than 0
+        if not all(l > 0 for l in lag):
+            raise ValueError("All values of lag must be larger than 0!")
+
+        self._lag = lag
+        self._start_value = start_value
+        super(SelfReferentialAdditiveNoiseModel, self).__init__(
+            prediction_model=prediction_model, noise_model=noise_model
+        )
+
+    def clone(self):
+        return SelfReferentialAdditiveNoiseModel(
+            prediction_model=self.prediction_model.clone(),lag=self._lag,start_value=self._start_value, noise_model=self.noise_model.clone()
+        )
+
+    def evaluate(self, parent_samples: np.ndarray, noise_samples: np.ndarray) -> np.ndarray:
+        """Evaluates the post non-linear model given samples (X, N). This is done by:
+            1. Evaluate f(X)
+            2. Evaluate f(X) + N
+            3. Return g(f(X) + N)
+        :param parent_samples: Samples from the inputs X.
+        :param noise_samples: Samples from the noise N.
+        :return: The Y values based on the given samples.
+        """
+        parent_samples, noise_samples = shape_into_2d(parent_samples, noise_samples)
+
+        predictions = np.empty(shape=(parent_samples.shape[0], 1), dtype=float)
+        # Initialize predictions with the start value to the first lag 
+        predictions[:min(self._lag), :] = self._start_value
+
+        for i in range(min(self._lag),len(predictions)):
+            samples = [parent_samples[i,:].reshape(1, -1)]
+            for lag in self._lag:
+                 samples.append(predictions[i-lag,:].reshape(1, -1))
+
+            predictions[i,:]= self._prediction_model.predict(np.concatenate(samples,axis=1))
+        predictions = shape_into_2d(predictions)
+
+        return self._invertible_function.evaluate(predictions + noise_samples)
+
 class ProbabilityEstimatorModel(ABC):
     @abstractmethod
     def estimate_probabilities(self, parent_samples: np.ndarray) -> np.ndarray:

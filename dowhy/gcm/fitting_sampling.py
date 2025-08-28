@@ -12,8 +12,11 @@ from dowhy.gcm.causal_models import (
     PARENTS_DURING_FIT,
     ProbabilisticCausalModel,
     validate_causal_dag,
+    validate_causal_graph,
     validate_causal_model_assignment,
 )
+from dowhy.gcm.util.timeseries import temporal_topological_sort, timelag_data
+from dowhy.gcm.util.timeseries import _parent_samples_of
 from dowhy.graph import get_ordered_predecessors, is_root_node
 
 
@@ -92,8 +95,13 @@ def fit_causal_model_of_target(
     if is_root_node(causal_model.graph, target_node):
         causal_model.causal_mechanism(target_node).fit(X=training_data[target_node].to_numpy()[~y_nan_mask])
     else:
+
+        training_data_lagged = timelag_data(causal_model, target_node, training_data)
+        x_nan_mask = pd.isna(training_data_lagged.to_numpy()).any(axis=1)
+        y_nan_mask = y_nan_mask | x_nan_mask
+
         causal_model.causal_mechanism(target_node).fit(
-            X=training_data[get_ordered_predecessors(causal_model.graph, target_node)].to_numpy()[~y_nan_mask],
+            X=training_data_lagged.to_numpy()[~y_nan_mask],
             Y=training_data[target_node].to_numpy()[~y_nan_mask],
         )
 
@@ -115,10 +123,11 @@ def draw_samples(causal_model: ProbabilisticCausalModel, num_samples: int) -> pd
     :param num_samples: Number of samples to draw.
     :return: A pandas data frame where columns correspond to the nodes in the graph and rows to the drawn joint samples.
     """
-    validate_causal_dag(causal_model.graph)
+    validate_causal_graph(causal_model.graph)
 
-    sorted_nodes = list(nx.topological_sort(causal_model.graph))
-    drawn_samples = pd.DataFrame(np.empty((num_samples, len(sorted_nodes))), columns=sorted_nodes)
+
+    sorted_nodes = list(temporal_topological_sort(causal_model.graph))
+    drawn_samples = pd.DataFrame(index=range(num_samples), columns=sorted_nodes)
 
     for node in sorted_nodes:
         causal_mechanism = causal_model.causal_mechanism(node)
@@ -131,7 +140,3 @@ def draw_samples(causal_model: ProbabilisticCausalModel, num_samples: int) -> pd
             ).squeeze()
 
     return drawn_samples
-
-
-def _parent_samples_of(node: Any, scm: ProbabilisticCausalModel, samples: pd.DataFrame) -> np.ndarray:
-    return samples[get_ordered_predecessors(scm.graph, node)].to_numpy()

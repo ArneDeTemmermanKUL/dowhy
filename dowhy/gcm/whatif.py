@@ -74,7 +74,7 @@ def _interventional_samples(
             continue
 
         if is_root_node(pcm.graph, node):
-            node_data = samples[node].to_numpy()
+            node_data = samples[node]
         else:
             node_data = pcm.causal_mechanism(node).draw_samples(_parent_samples_of(node, pcm, samples))
 
