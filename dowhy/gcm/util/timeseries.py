@@ -21,7 +21,7 @@ def timelag_data(causal_model, node:str, based_on: dict[np.ndarray]) -> pd.DataF
     predecessors_data = {}
     # lag the data to match the time lags of the predecessors
     for ordered_predecessor in ordered_predecessors:
-        if all(np.isnan(based_on[ordered_predecessor])):
+        if all(pd.isna(based_on[ordered_predecessor])):
             continue
         edge_data = causal_model.graph.get_edge_data(ordered_predecessor, node)
         if "time_lag" in edge_data:
@@ -153,14 +153,9 @@ def draw_samples_incremental(
         raise ValueError("observed_data must be a list of pandas dataframes")
 
     sorted_nodes = temporal_topological_sort(causal_model.graph)
-
+    current_region_length = num_samples
     drawn_samples: dict[str, np.ndarray] = {
-        node:np.full(num_samples,np.nan) for node in sorted_nodes
     }
-
-    for observed_data in observed_datas:
-        for col in observed_data.columns:
-            drawn_samples[col][:len(observed_data[col])] = observed_data[col].to_numpy()
 
     # each generation must be evaluated in parallel
     generations = strongly_connected_components_sort(causal_model.graph)
@@ -171,7 +166,18 @@ def draw_samples_incremental(
         gen_nodes = sorted(list(generation), key=lambda x: sorted_nodes.index(x))
 
         if is_cyclic:
-            for iteration in range(num_samples):
+            # iterative approach creates empty arrays upfront
+            #create empty arrays
+            for node in gen_nodes:
+                drawn_samples[node] = np.full(current_region_length,np.nan)
+
+            # fill with observed data
+            for observed_data in observed_datas:
+                for col in observed_data.columns:
+                    if col in gen_nodes:
+                        drawn_samples[col][:len(observed_data[col])] = observed_data[col].to_numpy()
+
+            for iteration in range(current_region_length):
                 for node in gen_nodes:
 
                     if not np.isnan(drawn_samples[node][iteration]):
@@ -200,17 +206,31 @@ def draw_samples_incremental(
         else:
             for node in gen_nodes:
                 causal_mechanism = causal_model.causal_mechanism(node)
-                n_filled_rows = sum(~np.isnan(drawn_samples[node]))
+
+                observed_data_node = np.array([])
+                # fill with observed data
+                for observed_data in observed_datas:
+                    for col in observed_data.columns:
+                        if col in gen_nodes:
+                            observed_data_node = observed_data[col].to_numpy()
+
+
+                n_filled_rows: int = len(observed_data_node)
 
                 if is_root_node(causal_model.graph, node):
 
-                    drawn_samples[node][n_filled_rows:] = causal_mechanism.draw_samples(num_samples - n_filled_rows).squeeze()
+                    samples = causal_mechanism.draw_samples(current_region_length - n_filled_rows).squeeze()
 
                 else:
+                    parent_samples = _parent_samples_of(node, causal_model, drawn_samples)[n_filled_rows:]
+                    samples = causal_mechanism.draw_samples(parent_samples).squeeze()
 
-                    drawn_samples[node][n_filled_rows:] = causal_mechanism.draw_samples(
-                                _parent_samples_of(node, causal_model, drawn_samples)[n_filled_rows:]
-                            ).squeeze()
+                    #shortening for aggregation
+                    if len(samples)< len(parent_samples):
+                        current_region_length = len(samples) + n_filled_rows
+
+                drawn_samples[node] = np.concatenate([observed_data_node,samples])
+
 
 
     return drawn_samples
