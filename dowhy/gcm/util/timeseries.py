@@ -140,7 +140,7 @@ def _parent_samples_of(
 def draw_samples_incremental(
     causal_model: ProbabilisticCausalModel,
     num_samples: int,
-    observed_datas: list[pd.DataFrame],
+    observed_datas: list[pd.DataFrame]= [],
 ) -> dict[str,np.ndarray]:
     """Draws new joint samples from the given graphical causal model. This is done by first generating random samples
     from root nodes and then propagating causal downstream effects through the graph.
