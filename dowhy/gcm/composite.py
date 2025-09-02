@@ -1,13 +1,14 @@
-from typing import Callable
+from typing import Callable, Union
 import networkx as nx
 import numpy as np
+from dowhy.gcm.aggregation_mechanisms import AggregationMechanism, DefinedAggregationMechanism
+from dowhy.gcm.causal_mechanisms import ConditionalStochasticModel, StochasticModel
 from dowhy.gcm.causal_models import (
     PARENTS_DURING_FIT,
     CAUSAL_MECHANISM,
     ProbabilisticCausalModel,
 )
 from dowhy.gcm.defined_causal_mechanisms import (
-    AggregationMechanism,
     DefinedStochasticModel,
 )
 from collections.abc import KeysView
@@ -16,15 +17,17 @@ class StructuralCausalModelComposite(ProbabilisticCausalModel):
     def __init__(
         self,
         models: list[ProbabilisticCausalModel],
-        links: dict[tuple[dict[str], str, str], Callable] = {},
+        links: dict[tuple[dict[str], str, str], Union[ ConditionalStochasticModel , StochasticModel]] = {},
     ):
         self.models = models
         self.links = links
 
         self.graph = self._graph(models, links.keys())
 
-        for (u, v, aggregation_column), callable in links.items():
-            self.set_causal_mechanism(v, mechanism=AggregationMechanism(callable))
+        for (u, v, aggregation_column), mechanism in links.items():
+
+            self.set_causal_mechanism(v, mechanism=mechanism)
+
             self.graph.nodes[v][PARENTS_DURING_FIT] = [aggregation_column] + sorted(
                 list(u)
             )

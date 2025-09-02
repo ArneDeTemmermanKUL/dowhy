@@ -3,7 +3,8 @@ import pandas as pd
 from pytest import fixture
 import networkx as nx
 from dowhy import gcm
-from dowhy.gcm.defined_causal_mechanisms import AggregationMechanism
+from dowhy.gcm.aggregation_mechanisms import DefinedAggregationMechanism
+from dowhy.gcm.aggregation_mechanisms import AggregationMechanism
 
 
 @fixture
@@ -21,37 +22,37 @@ def graphs() -> list[nx.DiGraph]:
 
 
 @fixture
-def datasets(n: int = 1000, n_aggregations: int = 20) -> list[pd.DataFrame]:
+def datasets(n: int = 1000, aggregation_lengths: list[int] = [15,5]) -> list[pd.DataFrame]:
     datasets: list[pd.DataFrame] = []
 
     A = np.random.normal(loc=0, scale=1, size=n)
     B = 2 * A
 
-    aggregation1 = np.repeat(range(n_aggregations), int(n / n_aggregations))
+    aggregation1 = np.repeat(range(int(n * len(aggregation_lengths)  / sum(aggregation_lengths))), np.tile(aggregation_lengths,int(n /(sum(aggregation_lengths)))))
 
-    datasets.append(pd.DataFrame(data=dict(AAA_aggregation=aggregation1, A=A, B=B)))
+    datasets.append(pd.DataFrame(data={"!index":aggregation1, "A":A, "B":B}))
 
     data_agg = (
         datasets[0]
         .groupby(
-            by="AAA_aggregation",
+            by="!index",
         )
         .sum()
         .reset_index()
     )
     C = data_agg["B"]
-    aggregation2 = data_agg["AAA_aggregation"]
+    aggregation2 = data_agg["!index"]
 
     D = 4 * C
 
-    datasets.append(pd.DataFrame(data=dict(AAA_aggregation=aggregation2, C=C, D=D)))
+    datasets.append(pd.DataFrame(data={"!index":aggregation2, "C":C, "D":D}))
 
     return datasets
 
 
 @fixture
 def links():
-    return {(frozenset(["B"]), "C", "AAA_aggregation"): "sum"}
+    return {(frozenset(["B"]), "C", "!index"): DefinedAggregationMechanism("sum")}
 
 
 @fixture
@@ -73,16 +74,13 @@ def graphical_causal_models(
     return causal_models
 
 
-@fixture
-def composite_gcm(graphical_causal_models: list[gcm.StructuralCausalModel], links):
-    composite = gcm.StructuralCausalModelComposite(
+
+def test_interventional_samples(graphical_causal_models: list[gcm.StructuralCausalModel], links, datasets):
+    observed_data = datasets[0][["!index", "A"]]
+
+    composite_gcm = gcm.StructuralCausalModelComposite(
         models=graphical_causal_models, links=links
     )
-    return composite
-
-
-def test_interventional_samples(composite_gcm, datasets):
-    observed_data = datasets[0][["AAA_aggregation", "A"]]
 
     samples = gcm.interventional_samples(
         causal_model=composite_gcm,
@@ -94,9 +92,60 @@ def test_interventional_samples(composite_gcm, datasets):
 
     for dataset in datasets:
         for column in dataset:
-            if column == "AAA_aggregation":
+            if column == "!index":
                 continue
 
             np.testing.assert_allclose(
                 samples[column], dataset[column].values, atol=1.0, rtol=0.0
             )
+
+
+def test_aggregation_composite_with_unequal_length_transformer(graphical_causal_models: list[gcm.StructuralCausalModel], datasets: list[pd.DataFrame]):
+
+    from aeon.transformations.collection.feature_based import SevenNumberSummary
+
+
+    transformer = SevenNumberSummary()
+
+    aam = AggregationMechanism(preprocess_transformer=None,transformer=transformer,
+    prediction_model=gcm.ml.create_linear_regressor())
+
+    X =  datasets[0][["!index","B"]].to_numpy()
+    Y = datasets[1]["C"].to_numpy().squeeze()
+
+    aam.fit(X,Y)
+
+    links= {(frozenset(["B"]), "C", "!index"): aam}
+
+    composite_gcm = gcm.StructuralCausalModelComposite(
+        models=graphical_causal_models, links=links
+    )
+
+    samples = gcm.interventional_samples(composite_gcm,interventions={'A':lambda a: a},observed_data=datasets[0][["A","!index"]])
+
+
+def test_aggregation_composite_with_padding(graphical_causal_models: list[gcm.StructuralCausalModel], datasets: list[pd.DataFrame]):
+
+    from aeon.transformations.collection import Padder
+    from aeon.transformations.collection.feature_based import SevenNumberSummary
+
+    padder = Padder()
+    transformer = SevenNumberSummary()
+
+
+    aam = AggregationMechanism(preprocess_transformer=padder,transformer=transformer,
+    prediction_model=gcm.ml.create_linear_regressor())
+
+    X =  datasets[0][["!index","B"]].to_numpy()
+    Y = datasets[1]["C"].to_numpy().squeeze()
+
+    aam.fit(X,Y)
+
+    links= {(frozenset(["B"]), "C", "!index"): aam}
+
+    composite_gcm = gcm.StructuralCausalModelComposite(
+        models=graphical_causal_models, links=links
+    )
+
+    samples = gcm.interventional_samples(composite_gcm,interventions={'A':lambda a: a},observed_data=datasets[0][["A","!index"]])
+
