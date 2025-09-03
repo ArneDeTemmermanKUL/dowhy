@@ -272,4 +272,4 @@ def _parent_samples_of(
     node: Any, scm: ProbabilisticCausalModel, samples: dict[str,pd.Series]
 ) -> np.ndarray:
     parent_samples = [samples[op] for op in get_ordered_predecessors(scm.graph, node)]
-    return np.stack(parent_samples,axis=1,dtype=object)
+    return np.stack(parent_samples,axis=1)
