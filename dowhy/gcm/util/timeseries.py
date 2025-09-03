@@ -4,7 +4,7 @@ from queue import Queue
 import numpy as np
 from typing import Any
 from dowhy import gcm
-from dowhy.gcm.causal_models import PARENTS_DURING_FIT, ProbabilisticCausalModel, validate_causal_graph
+from dowhy.gcm.causal_models import  ProbabilisticCausalModel, validate_causal_graph
 from dowhy.graph import get_ordered_predecessors, is_root_node
 
 import networkx as nx
@@ -17,9 +17,7 @@ def is_self_referential(graph: nx.DiGraph, node: str) -> bool:
 
 
 def timelag_data(causal_model, node:str, based_on: dict[np.ndarray]) -> pd.DataFrame:
-    ordered_predecessors = causal_model.graph.nodes[node][PARENTS_DURING_FIT]
-
-
+    ordered_predecessors = get_ordered_predecessors(causal_model.graph, node)
     predecessors_data = {}
     # lag the data to match the time lags of the predecessors
     for ordered_predecessor in ordered_predecessors:
