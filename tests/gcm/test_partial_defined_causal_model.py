@@ -18,43 +18,44 @@ from dowhy.gcm.divergence import estimate_kl_divergence_continuous_clf
 def _generate_data_with_categorical_input():
     X0 = np.random.normal(0, 1, 1000)
     X1 = np.random.choice(3, 1000).astype(str)
-    
-    data = pd.DataFrame({"X0": X0, "X1": X1, })
-    
-    data["X2"] = x2_relation(data[["X0","X1"]].values)
 
+    data = pd.DataFrame(
+        {
+            "X0": X0,
+            "X1": X1,
+        }
+    )
+
+    data["X2"] = x2_relation(data["X0"].to_numpy(),data["X1"].to_numpy())["X2"]
 
     return data
 
 
-def x2_relation(X: npt.NDArray):
-   
+def x2_relation(X0: np.ndarray, X1: np.ndarray):
     X2 = []
-    for i in range(len(X)):
-        X0, X1 = X[i][0],X[i][1]
-        tmp_value = 2 * X0
-        if X1 == "0":
+    for i in range(len(X0)):
+        X0i, X1i = X0[i], X1[i]
+        tmp_value = 2 * X0i
+        if X1i == "0":
             tmp_value -= 5
-        elif X1 == "1":
+        elif X1i == "1":
             tmp_value += 10
         else:
             tmp_value += 5
         X2.append(tmp_value)
-    return np.array(X2)
+    return dict(X2=np.array(X2))
 
 
 @flaky(max_runs=3)
 def test_given_categorical_input_data_when_draw_from_fitted_causal_graph_with_linear_anm_then_generates_correct_marginal_distribution():
     training_data = _generate_data_with_categorical_input()
 
-
     scm = PartialDefinedStructuralCausalModel(nx.DiGraph([("X0", "X2"), ("X1", "X2")]))
 
     scm.add_known_mappings(
-        {(frozenset(["X0", "X1"]), frozenset(["X2"])): (x2_relation, lambda : (0.0,))}
+        {(frozenset(["X0", "X1"]), frozenset(["X2"])): (x2_relation, lambda: (0.0,))}
     )
     assign_causal_mechanisms(scm, training_data)
-
 
     fit(scm, data=training_data)
 

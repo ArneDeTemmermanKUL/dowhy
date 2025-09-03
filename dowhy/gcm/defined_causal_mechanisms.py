@@ -12,7 +12,7 @@ class DefinedConditionalStochasticModel(ConditionalStochasticModel):
         self,
         relation: Callable[
             [np.ndarray],
-            np.ndarray,
+            dict[str,np.ndarray],
         ],
         noise: Callable[[], float] = lambda: 0,
     ) -> None:
@@ -29,7 +29,11 @@ class DefinedConditionalStochasticModel(ConditionalStochasticModel):
         noise_samples: np.ndarray,
     ) -> np.ndarray:
         parent_samples, noise_samples = shape_into_2d(parent_samples, noise_samples)
-        predictions = shape_into_2d(self.relation(parent_samples))
+
+        predictions = self.relation(*[parent_samples[:,i] for i in range(parent_samples.shape[1])])
+        predictions = np.stack(list(predictions.values()),axis=1)
+        predictions = shape_into_2d(predictions)
+
         return predictions + noise_samples
 
     def draw_samples(self, parent_samples: np.ndarray) -> np.ndarray:
@@ -69,13 +73,10 @@ class DefinedStochasticModel(StochasticModel):
 
 
 class RelationIndexer:
-    def __init__(self, relation: Callable[[np.ndarray], np.ndarray], i: int) -> None:
+    def __init__(self, relation: Callable[[np.ndarray], dict[str,np.ndarray]], node: str) -> None:
         self.relation = relation
-        self.i: int = i
+        self.node: str = node
 
-    def __call__(self, x: np.ndarray) -> np.ndarray:
+    def __call__(self, x: np.ndarray) -> dict[str,np.ndarray]:
         a = self.relation(x)
-        return a[:, self.i]
-
-
-
+        return {self.node:a[self.node]}
