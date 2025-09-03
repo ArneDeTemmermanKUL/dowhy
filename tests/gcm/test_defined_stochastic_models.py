@@ -21,7 +21,7 @@ def test_defined_stochastic_model():
 
 def test_defined_conditional_stochastic_model():
     def relation(a: npt.NDArray):
-        return 2 * a
+        return dict(b=2 * a)
 
     def noise():
         return np.random.normal(loc=0, scale=1)
@@ -38,12 +38,12 @@ def test_defined_conditional_stochastic_model():
 def test_relation_indexer():
 
     def relation(a: npt.NDArray):
-        return np.concatenate([a,3*a],axis=1)
+        return dict(b=a,c=3*a)
 
     def noise():
         return np.random.normal(loc=0, scale=1)
 
-    partial_relation = RelationIndexer(relation=relation, i=1)
+    partial_relation = RelationIndexer(relation=relation, node="c")
 
     dsm = DefinedConditionalStochasticModel(relation=partial_relation, noise=noise)
 
