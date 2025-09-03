@@ -2,6 +2,7 @@ import logging
 from collections.abc import Callable
 from typing import Union
 
+import numpy as np
 import pandas as pd
 from dowhy.gcm.causal_models import PARENTS_DURING_FIT, StructuralCausalModel
 
@@ -19,7 +20,7 @@ class PartialDefinedStructuralCausalModel(StructuralCausalModel):
         self,
         known_mappings: dict[
             tuple[frozenset[str], frozenset[str]],
-            tuple[Callable[[tuple[float]], tuple[float,]], Callable[[], tuple[float,]]],
+            tuple[Callable[[np.ndarray], dict[str, np.ndarray]], Callable[[], float]],
         ],
     ) -> None:
         for (u, v), mapping_noise in known_mappings.items():
@@ -29,7 +30,7 @@ class PartialDefinedStructuralCausalModel(StructuralCausalModel):
                 mapping = mapping_noise
                 noise = lambda: 0  # noqa: E731
 
-            for i, vi in enumerate(v):
+            for vi in v:
                 if vi not in self.graph.nodes:
                     continue
 
@@ -41,7 +42,7 @@ class PartialDefinedStructuralCausalModel(StructuralCausalModel):
                 if len(v) <= 1:
                     partial_mapping = mapping
                 else:
-                    partial_mapping = RelationIndexer(mapping, i=i)
+                    partial_mapping = RelationIndexer(mapping, node=vi)
                 if len(u) == 0:
                     mechanism = DefinedStochasticModel(partial_mapping)
                 else:
