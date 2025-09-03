@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Callable
 from typing import Union
 
@@ -11,9 +10,6 @@ from .defined_causal_mechanisms import (
     DefinedStochasticModel,
     RelationIndexer,
 )
-
-logger = logging.getLogger(__name__)
-
 
 class PartialDefinedStructuralCausalModel(StructuralCausalModel):
     def add_known_mappings(
@@ -35,10 +31,13 @@ class PartialDefinedStructuralCausalModel(StructuralCausalModel):
                     continue
 
                 if set(u) != set(self.graph.predecessors(vi)):
-                    logger.warning(
+                    print(
                         f"Predecessors {set(self.graph.predecessors(vi))} of node {vi} do not correspond to the input columns {u}"  # noqa: E501, G004
                     )
                     continue
+
+                print(f"Setting causal mechanism from {u} to {vi} with predefined mechanism")
+
                 if len(v) <= 1:
                     partial_mapping = mapping
                 else:
