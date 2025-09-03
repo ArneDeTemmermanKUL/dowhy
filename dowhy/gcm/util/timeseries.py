@@ -4,7 +4,7 @@ from queue import Queue
 import numpy as np
 from typing import Any
 from dowhy import gcm
-from dowhy.gcm.causal_models import  ProbabilisticCausalModel, validate_causal_graph
+from dowhy.gcm.causal_models import  PARENTS_DURING_FIT, ProbabilisticCausalModel, validate_causal_graph
 from dowhy.graph import get_ordered_predecessors, is_root_node
 
 import networkx as nx
@@ -134,7 +134,7 @@ def _parent_samples_of(
     node: Any, scm: ProbabilisticCausalModel, samples: dict[np.ndarray]
 ) -> np.ndarray:
     predecessors_data = timelag_data(scm, node, samples)
-    return predecessors_data.to_numpy()
+    return predecessors_data[scm.graph.nodes[node][PARENTS_DURING_FIT]].to_numpy()
 
 
 def draw_samples_incremental(
