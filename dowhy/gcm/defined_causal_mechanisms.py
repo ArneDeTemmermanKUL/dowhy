@@ -19,6 +19,29 @@ class DefinedConditionalStochasticModel(ConditionalStochasticModel):
 
     def fit(self, X: np.ndarray, Y: np.ndarray) -> None:  # noqa: N803
         """Fits the model according to the data."""
+        pass
+
+    def get_relation_parameters(self):
+        function_args = self.relation.__code__.co_varnames[
+                : (
+                    self.relation.__code__.co_argcount
+                    - (
+                        len(self.relation.__defaults__)
+                        if self.relation.__defaults__
+                        else 0
+                    )
+                )
+            ]
+        return function_args
+    
+    def sort_samples(self,samples: np.ndarray) -> np.ndarray:
+        relation_parameters = self.get_relation_parameters()
+        sorted_relation_parameters = sorted(relation_parameters)
+        mapping = [sorted_relation_parameters.index(rp) for rp in relation_parameters]
+   
+        return samples[:, mapping]
+
+
 
     def evaluate(
         self,
@@ -26,6 +49,7 @@ class DefinedConditionalStochasticModel(ConditionalStochasticModel):
         noise_samples: np.ndarray,
     ) -> np.ndarray:
         parent_samples, noise_samples = shape_into_2d(parent_samples, noise_samples)
+        parent_samples = self.sort_samples(parent_samples)
 
         predictions = self.relation(*[parent_samples[:,i] for i in range(parent_samples.shape[1])])
         predictions = np.stack(list(predictions.values()),axis=1)
