@@ -65,8 +65,17 @@ def get_ordered_predecessors(causal_graph: DirectedGraph, node: Any) -> List[Any
     This is necessary, because we select subsets of columns in Dataframes by using a node's parents, and these parents
     might not be returned in a reliable order.
     """
-    return sorted(causal_graph.predecessors(node))
+    predecessors= []
+    for predecessor in causal_graph.predecessors(node):
+        edge_data = causal_graph.get_edge_data(predecessor, node)
+        if "time_lag" in edge_data:
+            parent_time_lag = edge_data["time_lag"]
+            if not isinstance(parent_time_lag, tuple):
+                parent_time_lag = (parent_time_lag,)
+            for lag in parent_time_lag:
+                predecessors.append(f"{predecessor}_{-lag}")
 
+    return sorted(predecessors)
 
 def node_connected_subgraph_view(g: DirectedGraph, node: Any) -> Any:
     """Returns a view of the provided graph g that contains only nodes connected to the node passed in"""

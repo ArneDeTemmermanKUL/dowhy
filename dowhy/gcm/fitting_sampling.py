@@ -94,6 +94,8 @@ def fit_causal_model_of_target(
 
     if is_root_node(causal_model.graph, target_node):
         causal_model.causal_mechanism(target_node).fit(X=training_data[target_node].to_numpy()[~y_nan_mask])
+        causal_model.graph.nodes[target_node][PARENTS_DURING_FIT] = []
+
     else:
 
         training_data_lagged = timelag_data(causal_model, target_node, training_data)
@@ -105,15 +107,13 @@ def fit_causal_model_of_target(
             Y=training_data[target_node].to_numpy()[~y_nan_mask],
         )
 
-    # To be able to validate that the graph structure did not change between fitting and causal query, we store the
-    # parents of a node during fit. That way, before sampling, we can verify the parents are still the same. While
-    # this would automatically fail when the number of parents is different, there are other more subtle cases,
-    # where the number is still the same, but it's different parents, and therefore different data. That would yield
-    # wrong results, but would not fail.
-    causal_model.graph.nodes[target_node][PARENTS_DURING_FIT] = get_ordered_predecessors(
-        causal_model.graph, target_node
-    )
+        # To be able to validate that the graph structure did not change between fitting and causal query, we store the
+        # parents of a node during fit. That way, before sampling, we can verify the parents are still the same. While
+        # this would automatically fail when the number of parents is different, there are other more subtle cases,
+        # where the number is still the same, but it's different parents, and therefore different data. That would yield
+        # wrong results, but would not fail.
 
+        causal_model.graph.nodes[target_node][PARENTS_DURING_FIT] = list(training_data_lagged.columns)
 
 def draw_samples(causal_model: ProbabilisticCausalModel, num_samples: int) -> pd.DataFrame:
     """Draws new joint samples from the given graphical causal model. This is done by first generating random samples

@@ -15,35 +15,42 @@ def is_self_referential(graph: nx.DiGraph, node: str) -> bool:
     """Checks if the given node is self-referential in the causal model."""
     return node in graph.predecessors(node)
 
-
+def represents_int(s):
+    try: 
+        int(s)
+    except ValueError:
+        return False
+    else:
+        return True
+    
 def timelag_data(causal_model, node:str, based_on: dict[np.ndarray]) -> pd.DataFrame:
     ordered_predecessors = get_ordered_predecessors(causal_model.graph, node)
     predecessors_data = {}
     # lag the data to match the time lags of the predecessors
     for ordered_predecessor in ordered_predecessors:
-        if all(pd.isna(based_on[ordered_predecessor])):
-            continue
-        edge_data = causal_model.graph.get_edge_data(ordered_predecessor, node)
-        if "time_lag" in edge_data:
-            parent_time_lag = edge_data["time_lag"]
-            if not isinstance(parent_time_lag, tuple):
-                parent_time_lag = (parent_time_lag,)
-            for lag in parent_time_lag:
+        if "_" in ordered_predecessor and represents_int(str.rsplit(ordered_predecessor,"_",maxsplit=1)[-1]):
+            ordered_predecessor_node,shift =  str.rsplit(ordered_predecessor,"_",maxsplit=1)
+            lag = -int(shift)
 
-                # shift by 1) roll and 2) mask
-                predecessors_data[f"{ordered_predecessor}_{-lag}"] = np.roll( based_on[
-                    ordered_predecessor
-                ],lag)
+            if all(pd.isna(based_on[ordered_predecessor_node])):
+                continue
 
-                # mask the shifted values that went over the zero index
-                if lag > 0:
-                    predecessors_data[f"{ordered_predecessor}_{-lag}"][:lag] = np.nan
-                elif lag < 0:
-                    predecessors_data[f"{ordered_predecessor}_{-lag}"][lag:] = np.nan
+
+            # shift by 1) roll and 2) mask
+            predecessors_data[ordered_predecessor] = np.roll( based_on[
+                ordered_predecessor_node
+            ],lag)
+
+            # mask the shifted values that went over the zero index
+            if lag > 0:
+                predecessors_data[ordered_predecessor][:lag] = np.nan
+            elif lag < 0:
+                predecessors_data[ordered_predecessor][lag:] = np.nan
 
         else:
             predecessors_data[ordered_predecessor] = based_on[ordered_predecessor]
     return pd.DataFrame(predecessors_data)
+
 
 
 def extract_lag_level_graph(G: nx.DiGraph, max_lag: int) -> nx.DiGraph:
