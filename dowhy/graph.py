@@ -74,7 +74,8 @@ def get_ordered_predecessors(causal_graph: DirectedGraph, node: Any) -> List[Any
                 parent_time_lag = (parent_time_lag,)
             for lag in parent_time_lag:
                 predecessors.append(f"{predecessor}_{-lag}")
-
+        else:
+                predecessors.append(f"{predecessor}_0")
     return sorted(predecessors)
 
 def node_connected_subgraph_view(g: DirectedGraph, node: Any) -> Any:
