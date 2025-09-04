@@ -73,7 +73,7 @@ def get_ordered_predecessors(causal_graph: DirectedGraph, node: Any) -> List[Any
             if not isinstance(parent_time_lag, tuple):
                 parent_time_lag = (parent_time_lag,)
             for lag in parent_time_lag:
-                predecessors.append(f"{predecessor}_{-lag}")
+                predecessors.append(f"{predecessor}_{lag}")
         else:
                 predecessors.append(f"{predecessor}_0")
     return sorted(predecessors)

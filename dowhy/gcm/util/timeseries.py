@@ -30,7 +30,7 @@ def timelag_data(causal_model, node:str, based_on: dict[np.ndarray]) -> pd.DataF
     for ordered_predecessor in ordered_predecessors:
         if "_" in ordered_predecessor and represents_int(str.rsplit(ordered_predecessor,"_",maxsplit=1)[-1]):
             ordered_predecessor_node,shift =  str.rsplit(ordered_predecessor,"_",maxsplit=1)
-            lag = -int(shift)
+            lag = int(shift)
 
             if all(pd.isna(based_on[ordered_predecessor_node])):
                 continue
