@@ -28,7 +28,7 @@ class StructuralCausalModelComposite(ProbabilisticCausalModel):
 
             self.set_causal_mechanism(v, mechanism=mechanism)
 
-            self.graph.nodes[v][PARENTS_DURING_FIT] = [aggregation_column] + list(u)
+            self.graph.nodes[v][PARENTS_DURING_FIT] = [f"{aggregation_column}_0"] + [f"{ui}_0" for ui in u]
             
             if CAUSAL_MECHANISM not in self.graph.nodes[aggregation_column]:
                 self.set_causal_mechanism(
