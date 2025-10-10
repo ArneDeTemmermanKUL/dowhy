@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from dowhy import gcm
-from dowhy.gcm.aggregation_mechanisms import AggregationMechanism
+from dowhy.gcm.aggregation_mechanisms import AggregationRegressionMechanism
 from pytest import fixture,mark
 
 from aeon.transformations.collection.unequal_length import Padder
@@ -35,7 +35,7 @@ def test_aggregation_mechanism(data):
 
     transformer = SevenNumberSummary()
 
-    aam = AggregationMechanism(preprocess_transformer=None,transformer=transformer,
+    aam = AggregationRegressionMechanism(preprocess_transformer=None,transformer=transformer,
     prediction_model=gcm.ml.create_linear_regressor())
 
     aam.fit(X.reset_index().to_numpy(),Y.to_numpy().squeeze())
@@ -50,7 +50,7 @@ def test_aggregation_mechanism_with_uneven_data(data):
     padder = Padder()
     transformer = SevenNumberSummary()
     
-    aam = AggregationMechanism(preprocess_transformer=padder,transformer=transformer,
+    aam = AggregationRegressionMechanism(preprocess_transformer=padder,transformer=transformer,
     prediction_model=gcm.ml.create_linear_regressor())
 
     aam.fit(X.reset_index().to_numpy(),Y.to_numpy().squeeze())

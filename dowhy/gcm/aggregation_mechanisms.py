@@ -53,7 +53,54 @@ class DefinedAggregationMechanism(DefinedConditionalStochasticModel):
         return DefinedAggregationMechanism(self.relation)
 
 
-class AggregationMechanism(AdditiveNoiseModel):
+class AggregationMechanism(DefinedConditionalStochasticModel):
+    def __init__(
+        self,
+        preprocess_transformer: Optional[Transformer ],
+        transformer: Transformer,
+    ) -> None:
+        self.preprocess_transformer = preprocess_transformer
+        self.transformer = transformer
+
+    def fit(self, X: np.ndarray, Y: np.ndarray) -> None:
+        aggregation_column = X[:, 0]
+        X = X[:, 1:]
+        # reshape
+        X_agg = shape_into_3d(X, aggregation_column)
+
+        # Resample
+        if self.preprocess_transformer is not None:
+            X_agg = self.preprocess_transformer.fit_transform(X_agg)
+
+        X_agg = self.transformer.fit_transform(X_agg, Y)
+
+
+    def evaluate(
+        self,
+        parent_samples: np.ndarray,
+        noise_samples: np.ndarray,
+    ) -> np.ndarray:
+        aggregation_column = parent_samples[:, 0]
+        parent_samples = parent_samples[:, 1:]  # Remove the aggregation column
+
+        parent_samples, noise_samples = shape_into_2d(parent_samples, noise_samples)
+
+        # shape into 3D
+        agg_parent_samples = shape_into_3d(parent_samples, aggregation_column)
+
+        # Resample
+        if self.preprocess_transformer is not None:
+            agg_parent_samples = self.preprocess_transformer.transform(
+                agg_parent_samples
+            )
+
+        transformed_parent_samples = self.transformer.transform(agg_parent_samples)
+        
+        return transformed_parent_samples
+
+
+
+class AggregationRegressionMechanism(AdditiveNoiseModel):
     def __init__(
         self,
         preprocess_transformer: Optional[Transformer ],

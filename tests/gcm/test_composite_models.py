@@ -3,8 +3,7 @@ import pandas as pd
 from pytest import fixture
 import networkx as nx
 from dowhy import gcm
-from dowhy.gcm.aggregation_mechanisms import DefinedAggregationMechanism
-from dowhy.gcm.aggregation_mechanisms import AggregationMechanism
+from dowhy.gcm.aggregation_mechanisms import AggregationRegressionMechanism, DefinedAggregationMechanism
 
 
 @fixture
@@ -107,7 +106,7 @@ def test_aggregation_composite_with_unequal_length_transformer(graphical_causal_
 
     transformer = SevenNumberSummary()
 
-    aam = AggregationMechanism(preprocess_transformer=None,transformer=transformer,
+    aam = AggregationRegressionMechanism(preprocess_transformer=None,transformer=transformer,
     prediction_model=gcm.ml.create_linear_regressor())
 
     X =  datasets[0][["!index","B"]].to_numpy()
@@ -133,7 +132,7 @@ def test_aggregation_composite_with_padding(graphical_causal_models: list[gcm.St
     transformer = SevenNumberSummary()
 
 
-    aam = AggregationMechanism(preprocess_transformer=padder,transformer=transformer,
+    aam = AggregationRegressionMechanism(preprocess_transformer=padder,transformer=transformer,
     prediction_model=gcm.ml.create_linear_regressor())
 
     X =  datasets[0][["!index","B"]].to_numpy()
