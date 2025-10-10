@@ -1,6 +1,6 @@
 from typing import Optional
 from dowhy.gcm.causal_mechanisms import AdditiveNoiseModel, StochasticModel
-from dowhy.gcm.defined_causal_mechanisms import DefinedConditionalStochasticModel
+from dowhy.gcm.defined_causal_mechanisms import DefinedConditionalStochasticModel,ConditionalStochasticModel
 from dowhy.gcm.ml.prediction_model import PredictionModel
 from dowhy.gcm.util.general import shape_into_2d
 
@@ -53,7 +53,7 @@ class DefinedAggregationMechanism(DefinedConditionalStochasticModel):
         return DefinedAggregationMechanism(self.relation)
 
 
-class AggregationMechanism(DefinedConditionalStochasticModel):
+class AggregationMechanism(ConditionalStochasticModel):
     def __init__(
         self,
         preprocess_transformer: Optional[Transformer ],
