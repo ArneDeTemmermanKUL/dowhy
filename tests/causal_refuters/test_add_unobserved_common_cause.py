@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import patch
 
 import numpy as np
@@ -544,6 +545,9 @@ class TestAddUnobservedCommonCauseRefuter(object):
     )
     @patch("matplotlib.pyplot.figure")
     def test_evalue_linear_regression(self, mock_fig, estimator_method):
+        # generalized adjustment identification requires python >=3.10
+        if estimator_method.startswith("general_adjustment") and sys.version_info < (3, 10):
+            return
         data = dowhy.datasets.linear_dataset(
             beta=10, num_common_causes=5, num_samples=1000, treatment_is_binary=True, stddev_outcome_noise=5
         )
@@ -569,6 +573,9 @@ class TestAddUnobservedCommonCauseRefuter(object):
     )
     @patch("matplotlib.pyplot.figure")
     def test_evalue_logistic_regression(self, mock_fig, estimator_method):
+        # generalized adjustment identification requires python >=3.10
+        if estimator_method.startswith("general_adjustment") and sys.version_info < (3, 10):
+            return
         data = dowhy.datasets.linear_dataset(
             beta=10,
             outcome_is_binary=True,
@@ -591,3 +598,97 @@ class TestAddUnobservedCommonCauseRefuter(object):
         assert refute.stats["evalue_upper_ci"] is None
         assert refute.stats["evalue_lower_ci"] < refute.stats["evalue_estimate"]
         assert mock_fig.call_count > 0
+
+    def test_infer_default_kappa_linear_does_not_crash(self):
+        """Regression test: _infer_default_kappa_t/y crashed with IndexError when effect strengths
+        were omitted and confounders_effect_on_treatment/outcome were 'linear' because np.std()
+        returns a scalar that cannot be indexed with [0]."""
+        data = dowhy.datasets.linear_dataset(
+            beta=10,
+            num_common_causes=2,
+            num_samples=500,
+            treatment_is_binary=False,
+        )
+        model = CausalModel(
+            data=data["df"],
+            treatment=data["treatment_name"],
+            outcome=data["outcome_name"],
+            graph=data["gml_graph"],
+        )
+        identified_estimand = model.identify_effect()
+        estimate = model.estimate_effect(identified_estimand, method_name="backdoor.linear_regression")
+        # No effect_strength_on_treatment / effect_strength_on_outcome supplied — forces
+        # _infer_default_kappa_t and _infer_default_kappa_y to run the "linear" branch.
+        refute = model.refute_estimate(
+            identified_estimand,
+            estimate,
+            method_name="add_unobserved_common_cause",
+            confounders_effect_on_treatment="linear",
+            confounders_effect_on_outcome="linear",
+            simulation_method="direct-simulation",
+        )
+        assert refute is not None
+
+
+def _make_unobserved_refuter_model():
+    import pandas as pd
+
+    rng = np.random.RandomState(0)
+    n = 500
+    w = rng.normal(size=n)
+    v = (rng.uniform(size=n) < 1 / (1 + np.exp(-w))).astype(int)
+    y = 2 * v + w + rng.normal(size=n)
+    df = pd.DataFrame({"v0": v, "W0": w, "y": y})
+    model = CausalModel(data=df, treatment="v0", outcome="y", common_causes=["W0"])
+    identified_estimand = model.identify_effect()
+    estimate = model.estimate_effect(identified_estimand, method_name="backdoor.propensity_score_weighting")
+    return model, identified_estimand, estimate
+
+
+def _run_unobserved_refuter(random_state):
+    model, identified_estimand, estimate = _make_unobserved_refuter_model()
+    refute = model.refute_estimate(
+        identified_estimand,
+        estimate,
+        method_name="add_unobserved_common_cause",
+        confounders_effect_on_treatment="binary_flip",
+        confounders_effect_on_outcome="linear",
+        effect_strength_on_treatment=0.01,
+        effect_strength_on_outcome=0.02,
+        random_state=random_state,
+    )
+    return refute.new_effect
+
+
+def test_add_unobserved_common_cause_is_reproducible_with_random_state():
+    assert _run_unobserved_refuter(random_state=123) == _run_unobserved_refuter(random_state=123)
+
+
+def test_add_unobserved_common_cause_differs_across_random_states():
+    assert _run_unobserved_refuter(random_state=123) != _run_unobserved_refuter(random_state=456)
+
+
+def test_add_unobserved_common_cause_binary_flip_with_bool_dtype():
+    import pandas as pd
+
+    rng = np.random.RandomState(0)
+    n = 400
+    w = rng.normal(size=n)
+    treatment = rng.uniform(size=n) < 1 / (1 + np.exp(-w))
+    outcome = rng.uniform(size=n) < 1 / (1 + np.exp(-(treatment.astype(int) + w)))
+    df = pd.DataFrame({"v0": treatment, "W0": w, "y": outcome})
+    assert df["v0"].dtype == bool and df["y"].dtype == bool
+
+    model = CausalModel(data=df, treatment="v0", outcome="y", common_causes=["W0"])
+    identified_estimand = model.identify_effect(proceed_when_unidentifiable=True)
+    estimate = model.estimate_effect(identified_estimand, method_name="backdoor.linear_regression")
+    refute = model.refute_estimate(
+        identified_estimand,
+        estimate,
+        method_name="add_unobserved_common_cause",
+        confounders_effect_on_treatment="binary_flip",
+        confounders_effect_on_outcome="binary_flip",
+        effect_strength_on_treatment=0.5,
+        effect_strength_on_outcome=0.5,
+    )
+    assert np.isfinite(refute.new_effect)

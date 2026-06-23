@@ -1,7 +1,11 @@
+import numpy as np
+import pytest
 from pytest import mark
 
 import dowhy.datasets
+from dowhy import EstimandType, identify_effect_auto
 from dowhy.causal_estimators.linear_regression_estimator import LinearRegressionEstimator
+from dowhy.graph import build_graph_from_str
 
 from .base import SimpleEstimator, TestGraphObject, example_graph
 
@@ -187,3 +191,172 @@ class TestLinearRegressionEstimator(object):
         data["df"] = data["df"][example_graph.observed_nodes]
         estimator_tester = SimpleEstimator(0.1, LinearRegressionEstimator, identifier_method="general_adjustment")
         estimator_tester.custom_data_average_treatment_effect_test(data)
+
+    def test_none_identifier_method_does_not_raise(self):
+        """identifier_method=None (functional API) should not raise ValueError."""
+        data = dowhy.datasets.linear_dataset(
+            beta=10,
+            num_common_causes=1,
+            num_instruments=0,
+            num_treatments=1,
+            num_samples=500,
+            treatment_is_binary=True,
+        )
+        target_estimand = identify_effect_auto(
+            build_graph_from_str(data["gml_graph"]),
+            observed_nodes=list(data["df"].columns),
+            action_nodes=data["treatment_name"],
+            outcome_nodes=data["outcome_name"],
+            estimand_type=EstimandType.NONPARAMETRIC_ATE,
+        )
+        # functional API leaves identifier_method=None; estimator should not raise
+        target_estimand.identifier_method = None
+        estimator = LinearRegressionEstimator(identified_estimand=target_estimand)
+        estimator.fit(data["df"])  # should not raise
+
+    def test_test_significance_returns_scalar_float_for_single_treatment(self):
+        """_test_significance should return a plain float p-value for a single treatment variable.
+
+        Regression test for https://github.com/py-why/dowhy/issues/1019 where the p-value
+        was returned as a 1-element numpy array (``array([0.])``) instead of a scalar float.
+        """
+        data = dowhy.datasets.linear_dataset(
+            beta=10,
+            num_common_causes=1,
+            num_instruments=0,
+            num_treatments=1,
+            num_samples=500,
+            treatment_is_binary=True,
+        )
+        target_estimand = identify_effect_auto(
+            build_graph_from_str(data["gml_graph"]),
+            observed_nodes=list(data["df"].columns),
+            action_nodes=data["treatment_name"],
+            outcome_nodes=data["outcome_name"],
+            estimand_type=EstimandType.NONPARAMETRIC_ATE,
+        )
+        target_estimand.set_identifier_method("backdoor")
+        estimator = LinearRegressionEstimator(identified_estimand=target_estimand, test_significance=True)
+        estimator.fit(data["df"])
+        ate_estimate = estimator.estimate_effect(data["df"], control_value=0, treatment_value=1)
+        signif = ate_estimate.test_stat_significance()
+        p_value = signif["p_value"]
+        assert isinstance(
+            p_value, float
+        ), f"Expected scalar float p-value for single treatment, got {type(p_value)}: {p_value!r}"
+        assert 0.0 <= p_value <= 1.0, f"p-value {p_value} is not in [0, 1]"
+
+    def test_test_significance_returns_array_for_multiple_treatments(self):
+        """_test_significance should return a numpy array of p-values for multiple treatment variables."""
+        data = dowhy.datasets.linear_dataset(
+            beta=10,
+            num_common_causes=1,
+            num_instruments=0,
+            num_treatments=2,
+            num_samples=500,
+            treatment_is_binary=True,
+        )
+        target_estimand = identify_effect_auto(
+            build_graph_from_str(data["gml_graph"]),
+            observed_nodes=list(data["df"].columns),
+            action_nodes=data["treatment_name"],
+            outcome_nodes=data["outcome_name"],
+            estimand_type=EstimandType.NONPARAMETRIC_ATE,
+        )
+        target_estimand.set_identifier_method("backdoor")
+        estimator = LinearRegressionEstimator(identified_estimand=target_estimand, test_significance=True)
+        estimator.fit(data["df"])
+        ate_estimate = estimator.estimate_effect(data["df"], control_value=0, treatment_value=1)
+        signif = ate_estimate.test_stat_significance()
+        p_value = signif["p_value"]
+        assert isinstance(
+            p_value, np.ndarray
+        ), f"Expected numpy array p-value for multiple treatments, got {type(p_value)}: {p_value!r}"
+        assert p_value.shape == (2,), f"Expected shape (2,), got {p_value.shape}"
+        assert np.all((p_value >= 0.0) & (p_value <= 1.0)), f"p-values {p_value} are not all in [0, 1]"
+
+    @mark.parametrize("invalid_method", ["frontdoor", "iv", "mediation"])
+    def test_invalid_identifier_method_raises(self, invalid_method):
+        data = dowhy.datasets.linear_dataset(
+            beta=10,
+            num_common_causes=1,
+            num_instruments=1,
+            num_treatments=1,
+            num_samples=1000,
+            treatment_is_binary=True,
+        )
+        target_estimand = identify_effect_auto(
+            build_graph_from_str(data["gml_graph"]),
+            observed_nodes=list(data["df"].columns),
+            action_nodes=data["treatment_name"],
+            outcome_nodes=data["outcome_name"],
+            estimand_type=EstimandType.NONPARAMETRIC_ATE,
+        )
+        target_estimand.set_identifier_method(invalid_method)
+        estimator = LinearRegressionEstimator(identified_estimand=target_estimand)
+        with pytest.raises(ValueError, match="only supports backdoor and general_adjustment"):
+            estimator.fit(data["df"])
+
+    def test_evaluate_effect_strength_binary_treatment(self):
+        """evaluate_effect_strength must not raise for a single binary treatment.
+
+        Regression test for #416: estimate_effect_naive used data[list] instead of
+        data[col_name], returning a DataFrame that caused `ValueError: Cannot index with
+        multidimensional key` inside `.loc[]`.
+        """
+        data = dowhy.datasets.linear_dataset(
+            beta=10,
+            num_common_causes=1,
+            num_instruments=0,
+            num_treatments=1,
+            num_samples=500,
+            treatment_is_binary=True,
+        )
+        target_estimand = identify_effect_auto(
+            build_graph_from_str(data["gml_graph"]),
+            observed_nodes=list(data["df"].columns),
+            action_nodes=data["treatment_name"],
+            outcome_nodes=data["outcome_name"],
+            estimand_type=EstimandType.NONPARAMETRIC_ATE,
+        )
+        target_estimand.set_identifier_method("backdoor")
+        estimator = LinearRegressionEstimator(identified_estimand=target_estimand)
+        estimator.fit(data["df"])
+        ate_estimate = estimator.estimate_effect(data["df"], control_value=0, treatment_value=1)
+        # Should not raise ValueError: Cannot index with multidimensional key
+        strength = estimator.evaluate_effect_strength(data["df"], ate_estimate)
+        assert "fraction-effect" in strength
+        assert np.isfinite(strength["fraction-effect"])
+
+    def test_evaluate_effect_strength_non_binary_treatment(self):
+        """estimate_effect_naive must respect actual treatment_value / control_value, not hardcoded 0/1.
+
+        Regression test for #416: the old code used hardcoded ``== 1`` and ``== 0``, so
+        non-binary treatments (e.g. control_value=1, treatment_value=2) would silently
+        compute the wrong effect-strength ratio (selecting no rows).
+        """
+        data = dowhy.datasets.linear_dataset(
+            beta=10,
+            num_common_causes=1,
+            num_instruments=0,
+            num_treatments=1,
+            num_samples=1000,
+            treatment_is_binary=False,
+        )
+        df = data["df"]
+        # Recode continuous treatment to {1, 2} so both control and treatment rows exist (non-standard values)
+        df[data["treatment_name"][0]] = np.where(df[data["treatment_name"][0]] > 0, 2, 1)
+        target_estimand = identify_effect_auto(
+            build_graph_from_str(data["gml_graph"]),
+            observed_nodes=list(df.columns),
+            action_nodes=data["treatment_name"],
+            outcome_nodes=data["outcome_name"],
+            estimand_type=EstimandType.NONPARAMETRIC_ATE,
+        )
+        target_estimand.set_identifier_method("backdoor")
+        estimator = LinearRegressionEstimator(identified_estimand=target_estimand)
+        estimator.fit(df)
+        ate_estimate = estimator.estimate_effect(df, control_value=1, treatment_value=2)
+        # Should not raise; fraction-effect must be a finite number
+        strength = estimator.evaluate_effect_strength(df, ate_estimate)
+        assert np.isfinite(strength["fraction-effect"])

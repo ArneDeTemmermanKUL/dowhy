@@ -94,6 +94,19 @@ class PropensityScoreEstimator(CausalEstimator):
                     methods support this currently.
         """
         self.reset_encoders()  # Forget any existing encoders
+
+        if self._target_estimand.identifier_method is not None and self._target_estimand.identifier_method not in [
+            "backdoor",
+            "general_adjustment",
+        ]:
+            raise ValueError(
+                "{} only supports backdoor and general_adjustment identification strategies, "
+                "but got identifier_method='{}'. Use TwoStageRegressionEstimator for frontdoor "
+                "or mediation identification, or InstrumentalVariableEstimator for iv.".format(
+                    self.__class__.__name__, self._target_estimand.identifier_method
+                )
+            )
+
         self._set_effect_modifiers(data, effect_modifier_names)
 
         self.logger.debug("Adjustment set variables used:" + ",".join(self._target_estimand.get_adjustment_set()))
@@ -110,18 +123,18 @@ class PropensityScoreEstimator(CausalEstimator):
             self._observed_common_causes = None
             error_msg = "No common causes/confounders present. Propensity score based methods are not applicable"
             self.logger.error(error_msg)
-            raise Exception(error_msg)
+            raise ValueError(error_msg)
 
         # Check if the treatment is one-dimensional
         if len(self._target_estimand.treatment_variable) > 1:
-            error_msg = str(self.__class__) + "cannot handle more than one treatment variable"
-            raise Exception(error_msg)
+            error_msg = self.__class__.__name__ + " cannot handle more than one treatment variable"
+            raise ValueError(error_msg)
         # Checking if the treatment is binary
         treatment_values = data[self._target_estimand.treatment_variable[0]].astype(int).unique()
         if any([v not in [0, 1] for v in treatment_values]):
             error_msg = "Propensity score methods are applicable only for binary treatments"
             self.logger.error(error_msg)
-            raise Exception(error_msg)
+            raise ValueError(error_msg)
 
         if self.propensity_score_column not in data:
             if self.propensity_score_model is None:
@@ -130,6 +143,12 @@ class PropensityScoreEstimator(CausalEstimator):
             self.propensity_score_model.fit(self._observed_common_causes, treatment_reshaped)
 
         return self
+
+    def predict_proba(self, data):
+        """Estimate propensity scores on given data using the class's current propensity score model."""
+        data = data[self._observed_common_causes_names]
+        data = self._encode(data, "observed_common_causes")
+        return self.propensity_score_model.predict_proba(data)
 
     def estimate_propensity_score_column(self, data):
         try:

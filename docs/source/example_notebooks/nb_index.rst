@@ -207,7 +207,24 @@ Real world-inspired examples
         | **Level:** Advanced
         | **Task:** Causal Inference
 
+.. grid:: 2
 
+    .. grid-item-card:: :doc:`gcm_mta_incrementality_time_decay`
+
+        .. image:: ../_static/gcm_mta_incrementality_time_decay.png
+            :height: 120px
+            :align: center
+        +++
+        | **Level:** Advanced
+        | **Task:** Attribution to sales channels via GCM
+
+.. grid:: 2
+
+    .. grid-item-card:: :doc:`gcm_chest_xray_causal_inference`
+
+        +++
+        | **Level:** Advanced
+        | **Task:** Auditing CNN predictions for spurious correlations via GCM
 
 Examples on benchmark datasets
 -------------------------------
@@ -388,6 +405,20 @@ Miscellaneous
         | **Level:** Advanced
         | **Task:** Effect inference
 
+    .. grid-item-card:: :doc:`dowhy_generalized_covariate_adjustment_example`
+
+        +++
+        | **Level:** Advanced
+        | **Task:** Effect identification
+
+.. grid:: 2
+
+    .. grid-item-card:: :doc:`dowhy_generalized_covariate_adjustment_estimation_example`
+
+        +++
+        | **Level:** Advanced
+        | **Task:** Effect estimation
+
 .. toctree::
    :maxdepth: 1
    :caption: Introductory examples
@@ -419,6 +450,7 @@ Miscellaneous
    gcm_falsify_dag
    counterfactual_fairness_dowhy
    sales_attribution_intervention
+   gcm_chest_xray_causal_inference
 
 .. toctree::
    :maxdepth: 1
@@ -462,5 +494,7 @@ Miscellaneous
    dowhy_efficient_backdoor_example
    identifying_effects_using_id_algorithm
    dowhy_optimize_backdoor_example
+   dowhy_generalized_covariate_adjustment_example
+   dowhy_generalized_covariate_adjustment_estimation_example
    dowhy_functional_api
    dowhy_causal_api
